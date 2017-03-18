@@ -45,3 +45,18 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+*.LST
+*.htm
+main-code/template
+*.hex
+main-code/template.lnp
+*.M51
+main-code/template.uvgui.Yehow
+*.uvopt
+main-code/template.uvgui_admin.bak
+*.admin
+main-code/template_uvopt.bak
+*.bak
+main-code/template.uvproj
+*.OBJ
+main-code/template.plg
