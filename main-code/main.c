@@ -29,8 +29,8 @@ u8 *command[]=        //指针数组用于存放命令，注意此处顺序将�
 {
   "0x00",   //开锁 无参数
   "0x01",   //报警 无参数
-	"0x02",  //更改管理员密码，需附带欲改密码参数
-	"0x03"	 //启用或禁止管理员密码，参数on为打开，参数off为关闭
+  "0x02",  //更改管理员密码，需附带欲改密码参数
+  "0x03"	 //启用或禁止管理员密码，参数on为打开，参数off为关闭
 };
 
 /*
@@ -39,7 +39,7 @@ u8 *echo[]=  //指针数组用于存放回复内容。
 	"0x50",  //开锁成功
 	"0x51",  //命令不存在
 	"0x52",  //命令运行成功
-	"0x53",  //命令运行失败（参数错误）
+	"0x53"  //命令运行失败（参数错误）
 };
 */
 
@@ -67,22 +67,22 @@ void sendChar(u8 ch)
 //串口发送
 void sendstr(u8 *str)
 {
-	//添加头部
-	SBUF='#';
+  //添加头部
+  SBUF='#';
   while(TI!=1);
   TI=0;
   while(*str!='\0')
-     sendChar(*str++);
-	//添加尾部
-	SBUF='*';
+  sendChar(*str++);
+  //添加尾部
+  SBUF='*';
   while(TI!=1);
-  TI=0; 
+  TI=0;
 }
 
 //延时函数
 void delay(u16 i)
 {
-	while(i--);	
+	while(i--);
 }
 
 //错误提示
@@ -94,7 +94,7 @@ void warn(u16 beepdelay)
 	  while(beepdelay--)
 	  {
 			beep=~beep;
-			delay(25);	
+			delay(25);
 		}
 	}
 	else
@@ -112,7 +112,7 @@ void warn(u16 beepdelay)
 //密码开门
 void opendoor(void)
 {
-	door=0;		    //开门
+	door=0;		        //开门
 	sendstr("0x50");
 	delay(10000);
 	door=1;				//关门
@@ -128,7 +128,7 @@ void KeyDown(void)
 	{
 		delay(1000);      //延时10ms进行消抖
 		if(GPIO_KEY!=0x0f&&countkey!=4)  //再次检测键盘是否按下
-		{	
+		{
 			//测试列
 			GPIO_KEY=0X0F;
 			switch(GPIO_KEY)
@@ -176,68 +176,69 @@ void error_command(u16 clear)
 void do_command(u16 cmd_len)
 {
   u16 cmd_do=0;
-	u16 i;                     //多用变量
+  u16 i;                     //多用变量
   u16 cmd_order;
-	//sendstr(cmd_input);      //将接收到的命令发回
+    //sendstr(cmd_input);      //将接收到的命令发回
 	//sendstr(cmd_parainput);  //将接受到的参数发回
   for(cmd_order=0;cmd_order<cmd_len;cmd_order++)
 		if(strcmp(command[cmd_order],cmd_input)==0)
 		{
 			switch(cmd_order)
-      {
-				case 0: if(strlen(cmd_parainput)==0)
-									opendoor();  //开门
-								else
-									sendstr("0x53");
-								break;
+            {
+				//开门			
+                case 0: if(strlen(cmd_parainput)==0)
+                            opendoor();  //开门
+                        else
+                            sendstr("0x53");
+                        break;
 				//报警
-        case 1: if(strlen(cmd_parainput)==0)
-								{
-									sendstr("0x52");
-									warn(20000); //警告 
-								}
-								else
-									sendstr("0x53");
-								break;
+                case 1: if(strlen(cmd_parainput)==0)
+                        {
+                            sendstr("0x52");
+                            warn(20000); //警告
+                        }
+                        else
+                            sendstr("0x53");
+                        break;
 				//更改密码
-				case 2: if(strlen(cmd_parainput)==4)
-								{
-									for(i=0;i<4;i++)
-										if(cmd_parainput[i]<='9'&&cmd_parainput[i]>='0');  //判断是否为数字
-									else
-										i=5;
-									if(i==4)
-									{
-										for(i=0;i<4;i++)
-										adminpw[i]=cmd_parainput[i];
-										sendstr("0x52");
-									}
-									else
-										sendstr("0x53");
-								}
-								else
-									sendstr("0x53");
-								break;
+                case 2: if(strlen(cmd_parainput)==4)
+                        {
+                            for(i=0;i<4;i++)
+                                if(cmd_parainput[i]<='9'&&cmd_parainput[i]>='0');  //判断是否为数字
+                            else
+                                i=5;
+                            if(i==4)
+                            {
+                                for(i=0;i<4;i++)
+                                    adminpw[i]=cmd_parainput[i];
+                                sendstr("0x52");
+                            }
+                            else
+                                sendstr("0x53");
+                            }
+                        else
+                            sendstr("0x53");
+                        break;
 				//开启或关闭管理员密码
-				case 3: if(cmd_parainput[0]=='o'&&cmd_parainput[1]=='n')
-								{
-									adminpwon=1;
-									sendstr("0x52");
-								}
-								else if(cmd_parainput[0]=='o'&&cmd_parainput[1]=='f'&&cmd_parainput[2]=='f')
-								{	
-									adminpwon=0;
-									sendstr("0x52");
-								}
-								else
-									sendstr("0x53");
-								break;
+                case 3: if(cmd_parainput[0]=='o'&&cmd_parainput[1]=='n')
+                        {
+                            adminpwon=1;
+                            sendstr("0x52");
+                        }
+                        else if(cmd_parainput[0]=='o'&&cmd_parainput[1]=='f'&&cmd_parainput[2]=='f')
+                        {
+                            adminpwon=0;
+                            sendstr("0x52");
+                        }
+                        else
+                            sendstr("0x53");
+                        break;
 			}
 			cmd_do=1;
 		}
     if(cmd_do==0)
-			sendstr("0x51");
-		//清除数组内容
+    sendstr("0x51");
+    //清除数组内容
     cmd_input[0]='\0';
     cmd_parainput[0]='\0';
 }
@@ -265,13 +266,13 @@ void handle_command(u8 receive_data)
 			sendstr("0x51");
     }
 			cmd_parastart=1;
-    }	
+    }
     else if(receive_data=='*'&&cmd_start==1)  //命令结束符
     {
-			/*	
+			/*
 			if(cmd_parastart==1)
 				cmd_parainput[cmd_paracount]='\0';
-			else 
+			else
 				cmd_input[cmd_count]='\0';
 			*/
 			error_command(0);
@@ -303,19 +304,19 @@ void handle_command(u8 receive_data)
 void sendpw(void)
 {
 	ES=0;  //关闭接收中断
-  SBUF='#';                //将接收到的数据放入到发送寄存器
+  SBUF='#';                      //将接收到的数据放入到发送寄存器
 	while(!TI);			         //等待发送数据完成
-	TI=0;				             //清除发送完成标志位
+	TI=0;				         //清除发送完成标志位
   for(countkey=0;countkey<4;countkey++)
-	{		 
-		SBUF=inkey[countkey];  //将接收到的数据放入到发送寄存器
-		while(!TI);			       //等待发送数据完成
-		TI=0;				           //清除发送完成标志位
+	{
+		SBUF=inkey[countkey];    //将接收到的数据放入到发送寄存器
+		while(!TI);			     //等待发送数据完成
+		TI=0;				     //清除发送完成标志位
 	}
-	SBUF='*';                //将接收到的数据放入到发送寄存器
+	SBUF='*';                    //将接收到的数据放入到发送寄存器
 	while(!TI);			         //等待发送数据完成
-	TI=0;				             //清除发送完成标志位
-	ES=1;                    //打开接收中断
+	TI=0;				         //清除发送完成标志位
+	ES=1;                        //打开接收中断
 }
 */
 
@@ -323,21 +324,21 @@ void sendpw(void)
 void Usart() interrupt 4
 {
 	receiveData=SBUF;	      //记录接收到的数据
-	RI = 0;			            //清除接收中断标志位
-	handle_command(receiveData);	
+	RI = 0;			          //清除接收中断标志位
+	handle_command(receiveData);
 }
 
 //主函数
 void main()
-{	
-	UsartInit();            //串口初始化
+{
+	UsartInit();              //串口初始化
 	adminpwon=0;
 	while(1)
 	{
 		countkey=0;
 		while(countkey!=4)
-		{	
-			KeyDown();		      //按键读取	 
+		{
+			KeyDown();		  //按键读取
 		}
 		warn(1);              //按键结束提示
 		if(inkey[0]==adminpw[0]&&inkey[1]==adminpw[1]&&inkey[2]==adminpw[2]&&inkey[3]==adminpw[3]&&adminpwon==1)
