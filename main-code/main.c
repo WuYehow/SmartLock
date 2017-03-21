@@ -4,7 +4,8 @@
 typedef unsigned int u16;	  //对数据类型进行声明定义
 typedef unsigned char u8;
 
-#define GPIO_KEY P1
+#define GPIO_KEY P1  //矩阵键盘的io
+#define pwlen 4  //密码位数
 
 //定义特殊io
 sbit beep=P1^5;  //蜂鸣器的io口
@@ -14,15 +15,15 @@ sbit light=P2^1; //光警告io口
 //其他定义
 u16 countkey;	      //用来存放读取到的键值序号
 u16 adminpwon;      //控制管理员密码是否生效
-u8 inkey[4];			  //存储获取的密码
-u8 adminpw[4]={'0','1','2','3'};	 //管理员密码
+u8 inkey[pwlen+1]={'\0'};			  //存储获取的密码
+u8 adminpw[]="0123";//管理员密码
 u16 receiveData;
 
-// 命令部分的相关定义
+//命令部分的相关定义
 u16 cmd_parastart=0;
 u16 cmd_start=0;
-u8 cmd_input[5];
-u8 cmd_parainput[4];  //一个命令只可附加一个参数
+u8 cmd_input[5];  //命令长度4个字符
+u8 cmd_parainput[5];  //一个命令只可附加一个参数
 u16 cmd_paracount=0;
 u16 cmd_count=0;      //命令计数
 u8 *command[]=        //指针数组用于存放命令，注意此处顺序将影响do_command函数。
@@ -32,16 +33,6 @@ u8 *command[]=        //指针数组用于存放命令，注意此处顺序将�
   "0x02",  //更改管理员密码，需附带欲改密码参数
   "0x03"	 //启用或禁止管理员密码，参数on为打开，参数off为关闭
 };
-
-/*
-u8 *echo[]=  //指针数组用于存放回复内容。
-{
-	"0x50",  //开锁成功
-	"0x51",  //命令不存在
-	"0x52",  //命令运行成功
-	"0x53"  //命令运行失败（参数错误）
-};
-*/
 
 //初始化串口
 void UsartInit()
@@ -85,7 +76,7 @@ void delay(u16 i)
 	while(i--);
 }
 
-//错误提示
+//声光警告，参数为1时为按键结束提示，其他值时为持续时间
 void warn(u16 beepdelay)
 {
 	if(beepdelay==1)
@@ -109,19 +100,22 @@ void warn(u16 beepdelay)
 	}
 }
 
-//密码开门
-void opendoor(void)
+//密码开门,参数为1时为管理员密码开门
+void opendoor(int i)
 {
+	if(i==1)
+		sendstr("0x51");
+	else
+		sendstr("0x50");
 	door=0;		        //开门
-	sendstr("0x50");
 	delay(10000);
-	door=1;				//关门
+	door=1;				    //关门
 }
 
 //按键读取
 void KeyDown(void)
 {
-	u8 KeyValue;
+	u16 KeyValue;
 	u16 a=0;
 	GPIO_KEY=0x0f;
 	if(GPIO_KEY!=0x0f)  //读取按键是否按下
@@ -133,10 +127,10 @@ void KeyDown(void)
 			GPIO_KEY=0X0F;
 			switch(GPIO_KEY)
 			{
-				case(0X07):	KeyValue='0';break;
-				case(0X0b):	KeyValue='1';break;
-				case(0X0d): KeyValue='2';break;
-				case(0X0e):	KeyValue='3';break;
+				case(0X07):	KeyValue=0;break;
+				case(0X0b):	KeyValue=1;break;
+				case(0X0d):	KeyValue=2;break;
+				case(0X0e):	KeyValue=3;break;
 		    }
 			//测试行
 			GPIO_KEY=0XF0;
@@ -152,8 +146,13 @@ void KeyDown(void)
 				delay(1000);
 				a++;
 			}
-		  inkey[countkey]=KeyValue;
 			countkey++;
+			if(KeyValue>=0&&KeyValue<=9)
+				inkey[countkey-1]=KeyValue+'0';
+			else if(KeyValue==10)
+				countkey=countkey-2;  //清除功能
+			else if(KeyValue==12)
+				countkey=0;           //重输功能
 		}
 	}
 }
@@ -178,8 +177,10 @@ void do_command(u16 cmd_len)
   u16 cmd_do=0;
   u16 i;                     //多用变量
   u16 cmd_order;
-    //sendstr(cmd_input);      //将接收到的命令发回
-	//sendstr(cmd_parainput);  //将接受到的参数发回
+	/*
+	sendstr(cmd_input);      //将接收到的命令发回
+	sendstr(cmd_parainput);  //将接受到的参数发回
+	*/
   for(cmd_order=0;cmd_order<cmd_len;cmd_order++)
 		if(strcmp(command[cmd_order],cmd_input)==0)
 		{
@@ -187,57 +188,56 @@ void do_command(u16 cmd_len)
             {
 				//开门			
                 case 0: if(strlen(cmd_parainput)==0)
-                            opendoor();  //开门
+                            opendoor(0);  //开门
                         else
-                            sendstr("0x53");
+                            sendstr("0x54");
                         break;
 				//报警
                 case 1: if(strlen(cmd_parainput)==0)
                         {
-                            sendstr("0x52");
+                            sendstr("0x53");
                             warn(20000); //警告
                         }
                         else
-                            sendstr("0x53");
+                            sendstr("0x54");
                         break;
 				//更改密码
                 case 2: if(strlen(cmd_parainput)==4)
                         {
                             for(i=0;i<4;i++)
                                 if(cmd_parainput[i]<='9'&&cmd_parainput[i]>='0');  //判断是否为数字
-                            else
-                                i=5;
+																else
+																	i=5;
                             if(i==4)
                             {
-                                for(i=0;i<4;i++)
-                                    adminpw[i]=cmd_parainput[i];
-                                sendstr("0x52");
-                            }
-                            else
+                                strcpy(adminpw,cmd_parainput);
                                 sendstr("0x53");
                             }
+                            else
+                                sendstr("0x54");
+                        }
                         else
-                            sendstr("0x53");
+                            sendstr("0x54");
                         break;
 				//开启或关闭管理员密码
-                case 3: if(cmd_parainput[0]=='o'&&cmd_parainput[1]=='n')
+                case 3: if(strcmp(cmd_parainput,"on")==0)
                         {
                             adminpwon=1;
-                            sendstr("0x52");
+                            sendstr("0x53");
                         }
-                        else if(cmd_parainput[0]=='o'&&cmd_parainput[1]=='f'&&cmd_parainput[2]=='f')
+                        else if(strcmp(cmd_parainput,"off")==0)
                         {
                             adminpwon=0;
-                            sendstr("0x52");
+                            sendstr("0x53");
                         }
                         else
-                            sendstr("0x53");
+                            sendstr("0x54");
                         break;
-			}
-			cmd_do=1;
+            }
+						cmd_do=1;
 		}
     if(cmd_do==0)
-    sendstr("0x51");
+    sendstr("0x52");
     //清除数组内容
     cmd_input[0]='\0';
     cmd_parainput[0]='\0';
@@ -246,35 +246,33 @@ void do_command(u16 cmd_len)
 //命令处理
 void handle_command(u8 receive_data)
 {
-	if(receive_data=='#')  //命令开始符
-	{
+		if(receive_data=='#')  //命令开始符
+		{
 		cmd_count=0;
     cmd_start=1;
     cmd_parastart=0;
 		cmd_paracount=0;
-  }
-  else if(receive_data==' '&&cmd_start==1)
-  {
-		if(cmd_parastart==1)
-		{
-			error_command(1);
-			sendstr("0x53");
 		}
-		else if(cmd_count!=4)
+		else if(receive_data==' '&&cmd_start==1)
 		{
-			error_command(1);
-			sendstr("0x51");
-    }
+			if(cmd_parastart==1)
+			{
+				error_command(1);
+				sendstr("0x54");
+			}
+			else if(cmd_count!=4)
+			{
+				error_command(1);
+				sendstr("0x52");
+			}
 			cmd_parastart=1;
     }
     else if(receive_data=='*'&&cmd_start==1)  //命令结束符
     {
-			/*
 			if(cmd_parastart==1)
 				cmd_parainput[cmd_paracount]='\0';
 			else
 				cmd_input[cmd_count]='\0';
-			*/
 			error_command(0);
       //转到执行命令函数
 			do_command(sizeof(command)/sizeof(char *));
@@ -282,9 +280,9 @@ void handle_command(u8 receive_data)
 		else if((cmd_count==4&&cmd_parastart==0)||cmd_paracount==4)
 		{
 			if(cmd_paracount==4)
-				sendstr("0x53");
+				sendstr("0x54");
 			else
-				sendstr("0x51");
+				sendstr("0x52");
 			error_command(1);
 		}
 		else if(cmd_start==1)
@@ -329,21 +327,21 @@ void Usart() interrupt 4
 }
 
 //主函数
-void main()
+void main(void)
 {
-	UsartInit();              //串口初始化
+	UsartInit();           //串口初始化
 	adminpwon=0;
 	while(1)
 	{
 		countkey=0;
-		while(countkey!=4)
+		while(countkey<pwlen)
 		{
 			KeyDown();		  //按键读取
 		}
 		warn(1);              //按键结束提示
-		if(inkey[0]==adminpw[0]&&inkey[1]==adminpw[1]&&inkey[2]==adminpw[2]&&inkey[3]==adminpw[3]&&adminpwon==1)
-			opendoor();
-		else
+		if(strcmp(adminpw,inkey)==0&&adminpwon==1)
+			opendoor(1);
+			else
 			sendstr(inkey);
 	}
 }
