@@ -81,9 +81,9 @@ void warn(u16 beepdelay)
 {
 	if(beepdelay==1)
 	{
-		beepdelay=2000;
+	  beepdelay=2000;
 	  while(beepdelay--)
-	  {
+		{
 			beep=~beep;
 			delay(25);
 		}
@@ -121,25 +121,25 @@ void KeyDown(void)
 	if(GPIO_KEY!=0x0f)  //读取按键是否按下
 	{
 		delay(1000);      //延时10ms进行消抖
-		if(GPIO_KEY!=0x0f&&countkey!=4)  //再次检测键盘是否按下
+		if(GPIO_KEY!=0x0f)  //再次检测键盘是否按下
 		{
 			//测试列
 			GPIO_KEY=0X0F;
 			switch(GPIO_KEY)
 			{
-				case(0X07):	KeyValue=0;break;
-				case(0X0b):	KeyValue=1;break;
-				case(0X0d):	KeyValue=2;break;
-				case(0X0e):	KeyValue=3;break;
+				case(0X07):	KeyValue=1;break;
+				case(0X0b):	KeyValue=2;break;
+				case(0X0d):	KeyValue=3;break;
+				//case(0X0e):	KeyValue=3;break;
 		    }
 			//测试行
 			GPIO_KEY=0XF0;
 			switch(GPIO_KEY)
 			{
 				case(0X70):	KeyValue=KeyValue;break;
-				case(0Xb0):	KeyValue=KeyValue+4;break;
-				case(0Xd0): KeyValue=KeyValue+8;break;
-				case(0Xe0):	KeyValue=KeyValue+12;break;
+				case(0Xb0):	KeyValue=KeyValue+3;break;
+				case(0Xd0):	KeyValue=KeyValue+6;break;
+				case(0Xe0):	KeyValue=KeyValue+9;break;
 			}
 			while((a<50)&&(GPIO_KEY!=0xf0))	 //检测按键松手检测
 			{
@@ -147,17 +147,21 @@ void KeyDown(void)
 				a++;
 			}
 			countkey++;
-			if(KeyValue>=0&&KeyValue<=9)
+			if(KeyValue>0&&KeyValue<=9)
 				inkey[countkey-1]=KeyValue+'0';
 			else if(KeyValue==10)
 				countkey=countkey-2;  //清除功能
+			else if(KeyValue==11)
+				inkey[countkey-1]='0';
 			else if(KeyValue==12)
 				countkey=0;           //重输功能
+			else
+				countkey--;
 		}
 	}
 }
 
-//命令出错时清楚计数器，当参数为1时将清空命令数组和参数数组
+//命令出错时清除计数器，当参数为1时将清空命令数组和参数数组
 void error_command(u16 clear)
 {
 	if(clear==1)
@@ -206,8 +210,8 @@ void do_command(u16 cmd_len)
                         {
                             for(i=0;i<4;i++)
                                 if(cmd_parainput[i]<='9'&&cmd_parainput[i]>='0');  //判断是否为数字
-																else
-																	i=5;
+                            else
+                                i=5;
                             if(i==4)
                             {
                                 strcpy(adminpw,cmd_parainput);
@@ -260,14 +264,14 @@ void handle_command(u8 receive_data)
 				error_command(1);
 				sendstr("0x54");
 			}
-			else if(cmd_count!=4)
+		else if(cmd_count!=4)
 			{
 				error_command(1);
 				sendstr("0x52");
 			}
 			cmd_parastart=1;
     }
-    else if(receive_data=='*'&&cmd_start==1)  //命令结束符
+		else if(receive_data=='*'&&cmd_start==1)  //命令结束符
     {
 			if(cmd_parastart==1)
 				cmd_parainput[cmd_paracount]='\0';
