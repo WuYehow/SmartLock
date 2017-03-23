@@ -1,5 +1,6 @@
 #include "reg52.h"			 //此文件中定义了单片机的一些特殊功能寄存器
 #include "string.h"
+#include "eeprom.h"
 
 typedef unsigned int u16;	  //对数据类型进行声明定义
 typedef unsigned char u8;
@@ -14,7 +15,7 @@ sbit light=P2^1; //光警告io口
 
 //其他定义
 u16 countkey;	      //用来存放读取到的键值序号
-u16 adminpwon;      //控制管理员密码是否生效
+u8 adminpwon;      //控制管理员密码是否生效
 u8 inkey[pwlen+1]={'\0'};			  //存储获取的密码
 u8 adminpw[]="0123";//管理员密码
 u16 receiveData;
@@ -47,27 +48,25 @@ void UsartInit()
 	TR1=1;					//打开计数器
 }
 
-//串口发送字符串
-void sendChar(u8 ch)
-{
-   SBUF=ch;       // 送入缓冲区
-   while(TI!=1);  // 等待发送完毕
-   TI=0;          // 软件清零
-}
-
-//串口发送
+//串口发送（中断）
 void sendstr(u8 *str)
 {
+	EA=0;						//关闭总中断
   //添加头部
   SBUF='#';
   while(TI!=1);
-  TI=0;
+		TI=0;
   while(*str!='\0')
-  sendChar(*str++);
-  //添加尾部
+	{
+		SBUF=*str++;       // 送入缓冲区
+   while(TI!=1);  // 等待发送完毕
+   TI=0;          // 软件清零
+  }
+	//添加尾部
   SBUF='*';
   while(TI!=1);
-  TI=0;
+		TI=0;
+	EA=1;						//打开总中断
 }
 
 //延时函数
@@ -98,18 +97,6 @@ void warn(u16 beepdelay)
 		}
 		light=1;		     //光警告关
 	}
-}
-
-//密码开门,参数为1时为管理员密码开门
-void opendoor(int i)
-{
-	if(i==1)
-		sendstr("0x51");
-	else
-		sendstr("0x50");
-	door=0;		        //开门
-	delay(10000);
-	door=1;				    //关门
 }
 
 //按键读取
@@ -189,11 +176,16 @@ void do_command(u16 cmd_len)
 		if(strcmp(command[cmd_order],cmd_input)==0)
 		{
 			switch(cmd_order)
-            {
+			{
 				//开门			
                 case 0: if(strlen(cmd_parainput)==0)
-                            opendoor(0);  //开门
-                        else
+												{
+                            door=0;		        //开门
+														delay(10000);
+														door=1;				    //关门
+														sendstr("0x50");
+                        }
+												else
                             sendstr("0x54");
                         break;
 				//报警
@@ -226,19 +218,23 @@ void do_command(u16 cmd_len)
 				//开启或关闭管理员密码
                 case 3: if(strcmp(cmd_parainput,"on")==0)
                         {
-                            adminpwon=1;
+                            adminpwon='1';
+														ISP_IAP_sectorErase(0x2000);
+														ISP_IAP_writeData(0x21f0,&adminpwon,sizeof(adminpwon));
                             sendstr("0x53");
                         }
                         else if(strcmp(cmd_parainput,"off")==0)
                         {
-                            adminpwon=0;
+                            adminpwon='0';
+														ISP_IAP_sectorErase(0x2000);
+														ISP_IAP_writeData(0x21f0,&adminpwon,sizeof(adminpwon));
                             sendstr("0x53");
                         }
                         else
                             sendstr("0x54");
                         break;
-            }
-						cmd_do=1;
+			}
+			cmd_do=1;
 		}
     if(cmd_do==0)
     sendstr("0x52");
@@ -253,8 +249,8 @@ void handle_command(u8 receive_data)
 		if(receive_data=='#')  //命令开始符
 		{
 		cmd_count=0;
-    cmd_start=1;
-    cmd_parastart=0;
+		cmd_start=1;
+		cmd_parastart=0;
 		cmd_paracount=0;
 		}
 		else if(receive_data==' '&&cmd_start==1)
@@ -270,9 +266,9 @@ void handle_command(u8 receive_data)
 				sendstr("0x52");
 			}
 			cmd_parastart=1;
-    }
+		}
 		else if(receive_data=='*'&&cmd_start==1)  //命令结束符
-    {
+		{
 			if(cmd_parastart==1)
 				cmd_parainput[cmd_paracount]='\0';
 			else
@@ -280,7 +276,7 @@ void handle_command(u8 receive_data)
 			error_command(0);
       //转到执行命令函数
 			do_command(sizeof(command)/sizeof(char *));
-    }
+		}
 		else if((cmd_count==4&&cmd_parastart==0)||cmd_paracount==4)
 		{
 			if(cmd_paracount==4)
@@ -290,28 +286,27 @@ void handle_command(u8 receive_data)
 			error_command(1);
 		}
 		else if(cmd_start==1)
-    {
+		{
 			switch(cmd_parastart)
       {
 				case 0: cmd_input[cmd_count++]=receive_data;
-                break;
-        case 1: cmd_parainput[cmd_paracount++]=receive_data;
-                break;
+								break;
+				case 1: cmd_parainput[cmd_paracount++]=receive_data;
+								break;
       }
-    }
+		}
 }
 
-/*
-//串口发送密码
-void sendpw(void)
+//串口发送（中断外使用）
+void sendstring(u8 *str)
 {
 	ES=0;  //关闭接收中断
   SBUF='#';                      //将接收到的数据放入到发送寄存器
 	while(!TI);			         //等待发送数据完成
 	TI=0;				         //清除发送完成标志位
-  for(countkey=0;countkey<4;countkey++)
+  while(*str!='\0')
 	{
-		SBUF=inkey[countkey];    //将接收到的数据放入到发送寄存器
+		SBUF=*str++;    //将接收到的数据放入到发送寄存器
 		while(!TI);			     //等待发送数据完成
 		TI=0;				     //清除发送完成标志位
 	}
@@ -320,7 +315,6 @@ void sendpw(void)
 	TI=0;				         //清除发送完成标志位
 	ES=1;                        //打开接收中断
 }
-*/
 
 //中断（串口接受指令）
 void Usart() interrupt 4
@@ -334,6 +328,9 @@ void Usart() interrupt 4
 void main(void)
 {
 	UsartInit();           //串口初始化
+	adminpwon='0';
+	ISP_IAP_readData(0x21f0,&adminpwon,sizeof(adminpwon));
+	ISP_IAP_readData(0x2400,adminpw,sizeof(adminpw));
 	adminpwon=0;
 	while(1)
 	{
@@ -344,8 +341,13 @@ void main(void)
 		}
 		warn(1);              //按键结束提示
 		if(strcmp(adminpw,inkey)==0&&adminpwon==1)
-			opendoor(1);
-			else
-			sendstr(inkey);
+		{		
+			door=0;		        //开门
+			delay(10000);
+			door=1;
+			sendstring("0x51");
+		}
+		else
+			sendstring(inkey);
 	}
 }
