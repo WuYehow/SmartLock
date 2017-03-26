@@ -25,7 +25,7 @@ sfr ISP_CONTR = 0xe7;
 void ISP_IAP_disable(void);
 void ISP_IAP_trigger(void);
 void ISP_IAP_readData(unsigned int beginAddr, unsigned char* pBuf, unsigned int dataSize);
-void ISP_IAP_writeData(unsigned int beginAddr,unsigned char* pDat,unsigned int dataSize);
+void ISP_IAP_writeData(unsigned int beginAddr, unsigned char* pDat, unsigned int dataSize);
 void ISP_IAP_sectorErase(unsigned int sectorAddr);
 
 #endif
