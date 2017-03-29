@@ -4,6 +4,7 @@
 更新历史:
 时间                                    版本号                                    修改记录
 2017.3.26                                1.0                            代码重构，修正格式中不规范的地方。
+2017.3.29                                1.1                            修正编译中发现的问题。
 */
 
 #include "reg52.h"
@@ -11,8 +12,8 @@
 #include "eeprom.h"
 #include "lcd.h"
 
-typedef unsigned int uint;
-typedef unsigned char uchar;
+#define uint unsigned int
+#define uchar unsigned char
 
 #define GPIO_KEY P1 //矩阵键盘的io
 #define pwlen 4     //密码位数
@@ -78,7 +79,7 @@ void sendstr(uchar *str)
   }
   //添加尾部
   SBUF='*';
-  while(TI! = 1);
+  while(TI != 1);
     TI = 0;
   EA = 1;                 //打开总中断
 }
@@ -118,6 +119,7 @@ void KeyDown(void)
 {
   uint KeyValue;
   uint a = 0;
+  uint loop_count;
   GPIO_KEY = 0x0f;
   if (GPIO_KEY != 0x0f)        //读取按键是否按下
   {
@@ -159,14 +161,11 @@ void KeyDown(void)
       else
         countkey--;
       LcdWriteCom(0x80 + 0x4a);
-      for (i = 0; i < pwlen + 1; i++)
+      for (loop_count = 0; loop_count < pwlen + 1; loop_count++)
         LcdWriteData(' ');
       LcdWriteCom(0x80 + 0x4a);
-      for (i = 0; i < countkey; i++)
-      { 
-        //LcdWriteData(' ');
-        LcdWriteData(inkey[i]);
-      }
+      for (loop_count = 0; loop_count < countkey; loop_count++)
+        LcdWriteData(inkey[loop_count]);
     }
   }
 }
@@ -251,9 +250,9 @@ void do_command(uint cmd_len)
                   sendstr("0x54");
                 break;
         //开启或关闭管理员密码
-        case 3: if(strcmp(cmd_parainput, "on")==0)
+        case 3: if(strcmp(cmd_parainput, "on") == 0)
                 {
-                  adminpwon='1';
+                  adminpwon = '1';
                   ISP_IAP_sectorErase(0x2000);
                   ISP_IAP_writeData(0x2000, &adminpwon, sizeof(adminpwon));
                   if (adminpw[0] == 0xff);
@@ -374,9 +373,9 @@ void Usart() interrupt 4
 //主函数
 void main(void)
 {
+  uint loop_count;
   UsartInit();          //串口初始化
   LcdInit();            //LCD初始化
-  uint loop_count;
   ISP_IAP_readData(0x2000, &adminpwon, sizeof(adminpwon));
   ISP_IAP_readData(0x2200, adminpw, sizeof(adminpw));
   if (adminpwon == 0xff)

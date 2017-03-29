@@ -88,8 +88,8 @@ void LcdWriteData(uchar dat)      //写入数据
 void lcdstr(uchar *dat, uint len)
 {
   uint i;
-  for(i=0;i<len;i++)
-  if(*dat!='\0')
+  for(i = 0; i < len; i++)
+  if(*dat != '\0')
     LcdWriteData(*dat++);
   else
     break;
